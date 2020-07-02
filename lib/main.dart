@@ -81,10 +81,11 @@ class _MyAppState extends State<MyMapApp> {
   }
 
   void checkLocationPermission() async {
-    GeolocationStatus geolocationStatus =
-        await Geolocator().checkGeolocationPermissionStatus();
+    PermissionStatus checkStatus = await LocationPermissions()
+        .checkPermissionStatus(level: LocationPermissionLevel.locationWhenInUse);
 
-    if (geolocationStatus == GeolocationStatus.granted) {
+    if (checkStatus == PermissionStatus.granted) {
+      //Location Permission is granted
       Position position = await Geolocator().getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         locationPermissionLevel: GeolocationPermission.locationWhenInUse,
@@ -94,44 +95,26 @@ class _MyAppState extends State<MyMapApp> {
         _currentLatLng = LatLng(position.latitude, position.longitude);
       });
     } else {
-      print("location permission denied");
-
-      PermissionStatus checkStatus = await LocationPermissions()
-          .checkPermissionStatus(level: LocationPermissionLevel.location);
-
-      if (checkStatus == PermissionStatus.granted) {
-        //Location Permission is granted
-        Position position = await Geolocator().getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          locationPermissionLevel: GeolocationPermission.locationWhenInUse,
-        );
-        setState(() {
-          locationEnabled = true;
-          _currentLatLng = LatLng(position.latitude, position.longitude);
-        });
-      } else {
-        //Location Permission is not granted
-        PermissionStatus permission =
-            await LocationPermissions().requestPermissions();
-        if (permission == PermissionStatus.granted) {
-          //Location Runtime permission is granted
-          bool isLocationEnabled =
-              await Geolocator().isLocationServiceEnabled();
-          if (isLocationEnabled) {
-            //GPS is enabled on device
-            print("gps is enabled");
-            Position position = await Geolocator().getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.high,
-              locationPermissionLevel: GeolocationPermission.locationWhenInUse,
-            );
-            setState(() {
-              locationEnabled = true;
-              _currentLatLng = LatLng(position.latitude, position.longitude);
-            });
-          } else {
-            //GPS is not enabled on the device
-            print("gps is not enabled");
-          }
+      //Location Permission is not granted
+      PermissionStatus permission =
+          await LocationPermissions().requestPermissions();
+      if (permission == PermissionStatus.granted) {
+        //Location Runtime permission is granted
+        bool isLocationEnabled = await Geolocator().isLocationServiceEnabled();
+        if (isLocationEnabled) {
+          //GPS is enabled on device
+          print("gps is enabled");
+          Position position = await Geolocator().getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+            locationPermissionLevel: GeolocationPermission.locationWhenInUse,
+          );
+          setState(() {
+            locationEnabled = true;
+            _currentLatLng = LatLng(position.latitude, position.longitude);
+          });
+        } else {
+          //GPS is not enabled on the device
+          print("gps is not enabled");
         }
       }
     }
@@ -182,6 +165,21 @@ class _MyAppState extends State<MyMapApp> {
 
   polygonTapped() {
     print("polygon tapped");
+    if (polygon.isNotEmpty) {
+      setState(() {
+        Polygon selectedPolygon = polygon.elementAt(0);
+        polygon.remove(selectedPolygon);
+        polygon.add(Polygon(
+          polygonId: selectedPolygon.polygonId,
+          points: selectedPolygon.points,
+          strokeColor: selectedPolygon.strokeColor,
+          strokeWidth: selectedPolygon.strokeWidth,
+          fillColor: Colors.green,
+          consumeTapEvents: true,
+          onTap: polygonTapped(),
+        ));
+      });
+    }
   }
 
   void onMarkerTapped() {

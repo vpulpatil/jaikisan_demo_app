@@ -1,5 +1,9 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:location_permissions/location_permissions.dart';
 
 void main() {
   runApp(MyMapApp());
@@ -58,10 +62,85 @@ class MyMapApp extends StatefulWidget {
 class _MyAppState extends State<MyMapApp> {
   GoogleMapController mapController;
 
-  final LatLng _center = const LatLng(45.521563, -122.677433);
+  var _currentLatLng = LatLng(12.970314, 77.591789);
+
+  var zoomLevel = 13.0;
+  final Set<Polygon> polygon = HashSet<Polygon>();
+  final Set<Marker> markers = HashSet<Marker>();
+  final List<LatLng> polyLatLng = List<LatLng>();
+  var locationEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    checkLocationPermission();
+  }
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+  }
+
+  void checkLocationPermission() async {
+    GeolocationStatus geolocationStatus =
+        await Geolocator().checkGeolocationPermissionStatus();
+
+    if (geolocationStatus == GeolocationStatus.granted) {
+      Position position = await Geolocator().getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        locationPermissionLevel: GeolocationPermission.locationWhenInUse,
+      );
+      setState(() {
+        locationEnabled = true;
+        _currentLatLng = LatLng(position.latitude, position.longitude);
+      });
+    } else {
+      print("location permission denied");
+
+      PermissionStatus checkStatus = await LocationPermissions()
+          .checkPermissionStatus(level: LocationPermissionLevel.location);
+
+      if (checkStatus == PermissionStatus.granted) {
+        //Location Permission is granted
+        Position position = await Geolocator().getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          locationPermissionLevel: GeolocationPermission.locationWhenInUse,
+        );
+        setState(() {
+          locationEnabled = true;
+          _currentLatLng = LatLng(position.latitude, position.longitude);
+        });
+      } else {
+        //Location Permission is not granted
+        PermissionStatus permission =
+            await LocationPermissions().requestPermissions();
+        if (permission == PermissionStatus.granted) {
+          //Location Runtime permission is granted
+          bool isLocationEnabled =
+              await Geolocator().isLocationServiceEnabled();
+          if (isLocationEnabled) {
+            //GPS is enabled on device
+            print("gps is enabled");
+            Position position = await Geolocator().getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+              locationPermissionLevel: GeolocationPermission.locationWhenInUse,
+            );
+            setState(() {
+              locationEnabled = true;
+              _currentLatLng = LatLng(position.latitude, position.longitude);
+            });
+          } else {
+            //GPS is not enabled on the device
+            print("gps is not enabled");
+          }
+        }
+      }
+    }
+  }
+
+  void setLocationEnabledAction() {
+    setState(() {
+      locationEnabled = true;
+    });
   }
 
   @override
@@ -74,14 +153,52 @@ class _MyAppState extends State<MyMapApp> {
         ),
         body: GoogleMap(
           onMapCreated: _onMapCreated,
-
+          myLocationEnabled: locationEnabled,
+          myLocationButtonEnabled: locationEnabled,
           initialCameraPosition: CameraPosition(
-            target: _center,
-            zoom: 11.0,
+            target: _currentLatLng,
+            zoom: 13.0,
           ),
+          markers: markers,
+          polygons: polygon,
+          onTap: googleMapTapped,
         ),
       ),
     );
+  }
+
+  void googleMapTapped(LatLng tappedLatLng) {
+    polyLatLng.add(tappedLatLng);
+    setState(() {
+      markers.add(Marker(
+        markerId: MarkerId(tappedLatLng.hashCode.toString()),
+        position: tappedLatLng,
+        draggable: false,
+        consumeTapEvents: true,
+        onTap: onMarkerTapped,
+      ));
+    });
+  }
+
+  polygonTapped() {
+    print("polygon tapped");
+  }
+
+  void onMarkerTapped() {
+    if (polyLatLng.length > 2) {
+      setState(() {
+        polygon.add(Polygon(
+            polygonId: PolygonId(polygon.length.toString()),
+            points: polyLatLng.toList(growable: false),
+            fillColor: Color.fromARGB(23, 00, 00, 00),
+            consumeTapEvents: true,
+            onTap: polygonTapped(),
+            strokeWidth: 3,
+            strokeColor: Colors.black));
+        markers.clear();
+      });
+      polyLatLng.clear();
+    }
   }
 }
 

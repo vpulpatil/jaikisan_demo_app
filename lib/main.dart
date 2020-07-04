@@ -64,56 +64,44 @@ class _MyAppState extends State<MyMapApp> {
   }
 
   void checkLocationPermission() async {
+    //Checking if user has given Location Permission or not
     PermissionStatus checkStatus = await LocationPermissions()
         .checkPermissionStatus(
             level: LocationPermissionLevel.locationWhenInUse);
 
-    if (checkStatus == PermissionStatus.granted) {
-      //Location Permission is granted
-
-      //Now check if the gps is on or not
-      var location = Locn.Location();
-      bool _gpsEnabled = await location.serviceEnabled();
-      if (!_gpsEnabled) {
-        //GPS is not enabled
-        _gpsEnabled = await location.requestService();
-        if (!_gpsEnabled) {
-          //GPS is not enabled by user, therefore get user's last known locations
-          Position lastKnownPosition = await Geolocator().getLastKnownPosition(
-            desiredAccuracy: LocationAccuracy.high,
-            locationPermissionLevel: GeolocationPermission.locationWhenInUse,
-          );
-          setLocationEnabledAction(
-              lastKnownPosition.latitude, lastKnownPosition.longitude);
-          return;
-        }
-      }
-      Position position = await Geolocator().getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        locationPermissionLevel: GeolocationPermission.locationWhenInUse,
-      );
-      setLocationEnabledAction(position.latitude, position.longitude);
-    } else {
-      //Location Permission is not granted
+    if (checkStatus == PermissionStatus.denied) {
+      //Permission is denied, therefore request for permission
       PermissionStatus permission =
           await LocationPermissions().requestPermissions();
-      if (permission == PermissionStatus.granted) {
-        //Location Runtime permission is granted
-        bool isLocationEnabled = await Geolocator().isLocationServiceEnabled();
-        if (isLocationEnabled) {
-          //GPS is enabled on device
-          print("gps is enabled");
-          Position position = await Geolocator().getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
-            locationPermissionLevel: GeolocationPermission.locationWhenInUse,
-          );
-          setLocationEnabledAction(position.latitude, position.longitude);
-        } else {
-          //GPS is not enabled on the device
-          print("gps is not enabled");
-        }
+      if (permission == PermissionStatus.denied) {
+        //Location Runtime permission is denied or denied forever, then don't do anything
+        return;
       }
     }
+
+    //Now check if the gps is on or not
+    var location = Locn.Location();
+    bool _gpsEnabled = await location.serviceEnabled();
+    if (!_gpsEnabled) {
+      //GPS is not enabled
+      _gpsEnabled = await location.requestService();
+      if (!_gpsEnabled) {
+        //GPS is not enabled by user, therefore get user's last known locations
+        Position lastKnownPosition = await Geolocator().getLastKnownPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          locationPermissionLevel: GeolocationPermission.locationWhenInUse,
+        );
+        setLocationEnabledAction(
+            lastKnownPosition.latitude, lastKnownPosition.longitude);
+        return;
+      }
+    }
+    Position position = await Geolocator().getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+      locationPermissionLevel: GeolocationPermission.locationWhenInUse,
+    );
+    setLocationEnabledAction(position.latitude, position.longitude);
+
   }
 
   void setLocationEnabledAction(double latitude, double longitude) async {
